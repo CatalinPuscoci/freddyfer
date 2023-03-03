@@ -12,11 +12,8 @@
 use rand::prelude::*;
 use std::{
     env,
+    sync::{atomic::AtomicUsize, Arc},
     thread,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
     time::Duration,
 };
 
@@ -26,8 +23,7 @@ use serenity::{
     framework::{
         standard::{
             macros::{command, group},
-            Args,
-            CommandResult,
+            Args, CommandResult,
         },
         StandardFramework,
     },
@@ -38,28 +34,24 @@ use serenity::{
 };
 
 use songbird::{
-    input::{
-        self,
-        restartable::Restartable
-    },
+    input::{self, restartable::Restartable},
     tracks::create_player,
-    Event,
-    EventContext,
-    EventHandler as VoiceEventHandler,
-    SerenityInit,
-    TrackEvent,
+    Event, EventContext, EventHandler as VoiceEventHandler, SerenityInit, TrackEvent,
 };
 
 struct Handler;
-
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
-    async fn voice_state_update(&self, ctx:Context, _old: Option<VoiceState>, _new:VoiceState){
-        println!("{} joined voice channel {}",_new.member.unwrap().user, _new.channel_id.unwrap());
+    async fn voice_state_update(&self, ctx: Context, _old: Option<VoiceState>, _new: VoiceState) {
+        println!(
+            "{} joined voice channel {}",
+            _new.member.unwrap().user,
+            _new.channel_id.unwrap()
+        );
         let manager = songbird::get(&ctx)
             .await
             .expect("Songbird Voice client placed in at initialisation.")
@@ -68,26 +60,21 @@ impl EventHandler for Handler {
         let guild = _new.guild_id.unwrap();
         let channel_id = _new.channel_id.unwrap();
 
-
         if let Some(handler_lock) = manager.get(guild) {
             let mut handler = handler_lock.lock().await;
-            if channel_id.0 == handler.current_channel().unwrap().0{
-                let oldchannel = match _old{
-
-                    Some(oldstate) => {oldstate.channel_id}
-                        None =>{None}
+            if channel_id.0 == handler.current_channel().unwrap().0 {
+                let oldchannel = match _old {
+                    Some(oldstate) => oldstate.channel_id,
+                    None => None,
                 };
-                if oldchannel == None || oldchannel.unwrap().0 != channel_id.0{
-            let source = input::ffmpeg("Aloooo.mp3").await.unwrap();
-            let (mut audio, audio_handle) = create_player(source);
-            thread::sleep(Duration::from_millis(1000));
-            audio.set_volume(0.25);
-            handler.play(audio);
-            println!("playing")
-                
+                if oldchannel == None || oldchannel.unwrap().0 != channel_id.0 {
+                    let source = input::ffmpeg("Aloooo.mp3").await.unwrap();
+                    let (mut audio, audio_handle) = create_player(source);
+                    thread::sleep(Duration::from_millis(1000));
+                    audio.set_volume(0.25);
+                    handler.play(audio);
+                    println!("playing")
                 }
-
-
             }
         }
     }
@@ -95,7 +82,7 @@ impl EventHandler for Handler {
 
 #[group]
 #[commands(
-    deafen, join, leave, mute, play, queue, skip, stop, ping, undeafen, unmute, sound,
+    deafen, join, leave, mute, play, queue, skip, stop, ping, undeafen, unmute, sound, spam
 )]
 struct General;
 
@@ -110,8 +97,7 @@ async fn main() {
         .configure(|c| c.prefix("."))
         .group(&GENERAL_GROUP);
 
-    let intents = GatewayIntents::non_privileged()
-        | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
@@ -142,7 +128,7 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
             check_msg(msg.reply(ctx, "Not in a voice channel").await);
 
             return Ok(());
-        },
+        }
     };
 
     let mut handler = handler_lock.lock().await;
@@ -153,8 +139,8 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
         if let Err(e) = handler.deafen(true).await {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, format!("Failed: {:?}", e))
-                .await,
+                    .say(&ctx.http, format!("Failed: {:?}", e))
+                    .await,
             );
         }
 
@@ -181,7 +167,7 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
             check_msg(msg.reply(ctx, "Not in a voice channel").await);
 
             return Ok(());
-        },
+        }
     };
 
     let manager = songbird::get(ctx)
@@ -194,8 +180,8 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     if let Ok(_channel) = success {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, &format!("Joined {}", connect_to.mention()))
-            .await,
+                .say(&ctx.http, &format!("Joined {}", connect_to.mention()))
+                .await,
         );
 
         let chan_id = msg.channel_id;
@@ -225,8 +211,8 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Error joining the channel")
-            .await,
+                .say(&ctx.http, "Error joining the channel")
+                .await,
         );
     }
 
@@ -240,7 +226,6 @@ struct TrackEndNotifier {
 
 #[async_trait]
 impl VoiceEventHandler for TrackEndNotifier {
-
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         //    //if let EventContext::Track(track_list) = ctx {
         //    //    check_msg(
@@ -296,8 +281,8 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
         if let Err(e) = manager.remove(guild_id).await {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, format!("Failed: {:?}", e))
-                .await,
+                    .say(&ctx.http, format!("Failed: {:?}", e))
+                    .await,
             );
         }
 
@@ -326,7 +311,7 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
             check_msg(msg.reply(ctx, "Not in a voice channel").await);
 
             return Ok(());
-        },
+        }
     };
 
     let mut handler = handler_lock.lock().await;
@@ -337,8 +322,8 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
         if let Err(e) = handler.mute(true).await {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, format!("Failed: {:?}", e))
-                .await,
+                    .say(&ctx.http, format!("Failed: {:?}", e))
+                    .await,
             );
         }
 
@@ -361,26 +346,21 @@ async fn sound(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let file = match args.single::<String>() {
         Ok(file) => file,
         Err(_) => {
-            check_msg(
-                msg.channel_id
-                .say(&ctx.http, "Not a string???")
-                .await,
-            );
+            check_msg(msg.channel_id.say(&ctx.http, "Not a string???").await);
 
             return Ok(());
-        },
+        }
     };
-    if file.starts_with('/') || file.starts_with('\\') || file.starts_with('.') || file.starts_with('~')
+    if file.starts_with('/')
+        || file.starts_with('\\')
+        || file.starts_with('.')
+        || file.starts_with('~')
     {
-        check_msg(
-            msg.channel_id
-            .say(&ctx.http, "uhhhh no")
-            .await,
-        );
+        check_msg(msg.channel_id.say(&ctx.http, "uhhhh no").await);
         return Ok(());
-
     }
 
+    let path = format!("sounds/{}", file);
 
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -393,7 +373,7 @@ async fn sound(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
 
-        let source = match input::ffmpeg(file.clone()).await {
+        let source = match input::ffmpeg(path.clone()).await {
             Ok(source) => source,
             Err(why) => {
                 println!("Err starting source: {:?}", why);
@@ -401,34 +381,72 @@ async fn sound(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
 
                 return Ok(());
-            },
+            }
         };
-        match args.single::<String>() {
-            Ok(_) => {
-                for _ in 1..10{
-                    let source = input::ffmpeg(file.clone()).await.unwrap(); 
-                    let mut rng = rand::thread_rng();
-                    thread::sleep(Duration::from_millis(rng.gen_range(25..125)));
-                    handler.play_source(source);
-                }
-            },
-            Err(_) => {
-                println!("playing sound");
-                let song = handler.play_source(source);
-                return Ok(());
-            },
-        };
-
 
         // This handler object will allow you to, as needed,
         // control the audio track via events and further commands.
-        let song = handler.play_source(source);
-
-
-
+        let song = handler.play_only_source(source);
     }
     Ok(())
 }
+
+#[command]
+#[only_in(guilds)]
+async fn spam(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let file = match args.single::<String>() {
+        Ok(file) => file,
+        Err(_) => {
+            check_msg(msg.channel_id.say(&ctx.http, "Not a string???").await);
+
+            return Ok(());
+        }
+    };
+
+    if file.starts_with('/')
+        || file.starts_with('\\')
+        || file.starts_with('.')
+        || file.starts_with('~')
+    {
+        check_msg(msg.channel_id.say(&ctx.http, "uhhhh no").await);
+
+        return Ok(());
+    }
+
+    let path = format!("sounds/{}", file);
+
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let repeat_count = match args.single::<i32>() {
+            Ok(count) => {
+                if 0 < count && count < 50 {
+                    count
+                } else {
+                    1
+                }
+            }
+            Err(_) => 10,
+        };
+
+        for _ in 0..repeat_count {
+            let source = input::ffmpeg(path.clone()).await.unwrap();
+            let mut rng = rand::thread_rng();
+            thread::sleep(Duration::from_millis(rng.gen_range(25..125)));
+            handler.play_source(source);
+        }
+    }
+    Ok(())
+}
+
 #[command]
 #[only_in(guilds)]
 async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
@@ -437,19 +455,19 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         Err(_) => {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, "Must provide a URL to a video or audio")
-                .await,
+                    .say(&ctx.http, "Must provide a URL to a video or audio")
+                    .await,
             );
 
             return Ok(());
-        },
+        }
     };
 
     if !url.starts_with("http") {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Must provide a valid URL")
-            .await,
+                .say(&ctx.http, "Must provide a valid URL")
+                .await,
         );
 
         return Ok(());
@@ -474,7 +492,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
 
                 return Ok(());
-            },
+            }
         };
 
         // This handler object will allow you to, as needed,
@@ -509,8 +527,8 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Not in a voice channel to play in")
-            .await,
+                .say(&ctx.http, "Not in a voice channel to play in")
+                .await,
         );
     }
 
@@ -552,8 +570,8 @@ impl VoiceEventHandler for SongEndNotifier {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
         check_msg(
             self.chan_id
-            .say(&self.http, "Song faded out completely!")
-            .await,
+                .say(&self.http, "Song faded out completely!")
+                .await,
         );
 
         None
@@ -568,19 +586,19 @@ async fn queue(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         Err(_) => {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, "Must provide a URL to a video or audio")
-                .await,
+                    .say(&ctx.http, "Must provide a URL to a video or audio")
+                    .await,
             );
 
             return Ok(());
-        },
+        }
     };
 
     if !url.starts_with("http") {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Must provide a valid URL")
-            .await,
+                .say(&ctx.http, "Must provide a valid URL")
+                .await,
         );
 
         return Ok(());
@@ -607,24 +625,24 @@ async fn queue(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
 
                 return Ok(());
-            },
+            }
         };
 
         handler.enqueue_source(source.into());
 
         check_msg(
             msg.channel_id
-            .say(
-                &ctx.http,
-                format!("Added song to queue: position {}", handler.queue().len()),
-            )
-            .await,
+                .say(
+                    &ctx.http,
+                    format!("Added song to queue: position {}", handler.queue().len()),
+                )
+                .await,
         );
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Not in a voice channel to play in")
-            .await,
+                .say(&ctx.http, "Not in a voice channel to play in")
+                .await,
         );
     }
 
@@ -649,17 +667,17 @@ async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
         check_msg(
             msg.channel_id
-            .say(
-                &ctx.http,
-                format!("Song skipped: {} in queue.", queue.len()),
-            )
-            .await,
+                .say(
+                    &ctx.http,
+                    format!("Song skipped: {} in queue.", queue.len()),
+                )
+                .await,
         );
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Not in a voice channel to play in")
-            .await,
+                .say(&ctx.http, "Not in a voice channel to play in")
+                .await,
         );
     }
 
@@ -686,8 +704,8 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Not in a voice channel to play in")
-            .await,
+                .say(&ctx.http, "Not in a voice channel to play in")
+                .await,
         );
     }
 
@@ -710,8 +728,8 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
         if let Err(e) = handler.deafen(false).await {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, format!("Failed: {:?}", e))
-                .await,
+                    .say(&ctx.http, format!("Failed: {:?}", e))
+                    .await,
             );
         }
 
@@ -719,8 +737,8 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Not in a voice channel to undeafen in")
-            .await,
+                .say(&ctx.http, "Not in a voice channel to undeafen in")
+                .await,
         );
     }
 
@@ -742,8 +760,8 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
         if let Err(e) = handler.mute(false).await {
             check_msg(
                 msg.channel_id
-                .say(&ctx.http, format!("Failed: {:?}", e))
-                .await,
+                    .say(&ctx.http, format!("Failed: {:?}", e))
+                    .await,
             );
         }
 
@@ -751,8 +769,8 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         check_msg(
             msg.channel_id
-            .say(&ctx.http, "Not in a voice channel to unmute in")
-            .await,
+                .say(&ctx.http, "Not in a voice channel to unmute in")
+                .await,
         );
     }
 
