@@ -68,7 +68,7 @@ impl EventHandler for Handler {
                     None => None,
                 };
                 if oldchannel == None || oldchannel.unwrap().0 != channel_id.0 {
-                    let source = input::ffmpeg("Aloooo.mp3").await.unwrap();
+                    let source = input::ffmpeg("sounds/Aloooo.mp3").await.unwrap();
                     let (mut audio, audio_handle) = create_player(source);
                     thread::sleep(Duration::from_millis(1000));
                     audio.set_volume(0.25);
