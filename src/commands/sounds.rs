@@ -120,10 +120,20 @@ pub async fn spam(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
 
 #[command]
 #[only_in(guilds)]
-pub async fn siren(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let pathl = get_sound_path("tacil.ogg");
-    let pathr = get_sound_path("tacir.ogg");
-
+pub async fn siren(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let option = args.single::<String>().expect("Not a string???😤😤");
+    for c in option.chars(){
+        if c.is_numeric(){
+            check_msg(msg.reply(ctx, "Usage: .siren <tense|taci> <repeat count>").await);
+            return Ok(())
+        }
+    }
+    if !(option.eq(&"taci".to_string()) || option.eq(&"tense".to_string()) ){
+                    check_msg(msg.reply(ctx, "Stiu doar tense si taci").await);
+                    return Ok(())
+    }
+    let pathl = get_sound_path(format!("{}l.ogg",option).as_str());
+    let pathr = get_sound_path(format!("{}r.ogg",option).as_str());
     let guild = msg.guild(ctx).unwrap();
     let guild_id = guild.id;
 
