@@ -82,7 +82,7 @@ impl EventHandler for Handler {
 
 #[group]
 #[commands(
-    deafen, join, leave, mute, play, queue, skip, stop, ping, undeafen, unmute, sound, spam
+    deafen, join, leave, mute, play, queue, skip, stop, ping, undeafen, unmute, sound, spam,siren
 )]
 struct General;
 
@@ -446,6 +446,66 @@ async fn spam(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     }
     Ok(())
 }
+
+#[command]
+#[only_in(guilds)]
+async fn siren(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let pathl = format!("sounds/tacil.ogg");
+    let pathr = format!("sounds/tacir.ogg");
+
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let mut sourcel = match input::ffmpeg(pathr.clone()).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("Err starting source: {:?}", why);
+                check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
+                return Ok(());
+            }
+        };
+        let mut sourcer = match input::ffmpeg(pathl.clone()).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("Err starting source: {:?}", why);
+                check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
+                return Ok(());
+            }
+        };
+        let repeat_count = match args.single::<i32>() {
+            Ok(count) => {
+                if 0 < count && count < 50 {
+                    count
+                } else {
+                    1
+                }
+            }
+            Err(_) => 10,
+        };
+        // This handler object will allow you to, as needed,
+        // control the audio track via events and further commands.
+        for i in 1..repeat_count{
+            sourcel = input::ffmpeg(pathl.clone()).await.unwrap();
+            sourcer = input::ffmpeg(pathr.clone()).await.unwrap();
+        let song = handler.enqueue_source(sourcel);
+        let song = handler.enqueue_source(sourcer);
+
+            
+        }
+
+    }
+    Ok(())
+}
+
+
 
 #[command]
 #[only_in(guilds)]
