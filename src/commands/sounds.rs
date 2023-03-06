@@ -121,7 +121,13 @@ pub async fn spam(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
 #[command]
 #[only_in(guilds)]
 pub async fn siren(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let option = args.single::<String>().expect("Not a string???😤😤");
+    let option = match args.single::<String>(){
+        Ok(option) => {option}
+        Err(_)=> {
+            check_msg(msg.reply(ctx, "Not even a string???😤😤😤").await);
+            return  Ok(())
+        }
+    };
     for c in option.chars(){
         if c.is_numeric(){
             check_msg(msg.reply(ctx, "Usage: .siren <tense|taci> <repeat count>").await);
