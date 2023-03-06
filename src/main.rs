@@ -18,7 +18,7 @@ async fn main() {
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("~"))
+        .configure(|c| c.prefix("."))
         .group(&ESSENTIALS_GROUP)
         .group(&SOUNDS_GROUP)
         .help(&HELP);

@@ -6,7 +6,11 @@ use serenity::{
     model::{channel::Message, gateway::Ready, voice::VoiceState},
 };
 
-use crate::utils::{checks::check_msg, diacritics::clean_all, parse::get_sound_path};
+use crate::utils::{
+    checks::{check_msg, check_result},
+    diacritics::clean_all,
+    parse::get_sound_path,
+};
 use songbird::{input, tracks::create_player};
 
 pub struct MainEventHandler;
@@ -16,12 +20,14 @@ impl EventHandler for MainEventHandler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
+
     async fn voice_state_update(&self, ctx: Context, _old: Option<VoiceState>, _new: VoiceState) {
         println!(
             "{} joined voice channel {}",
             _new.member.unwrap().user,
             _new.channel_id.unwrap()
         );
+
         let manager = songbird::get(&ctx)
             .await
             .expect("Songbird Voice client placed in at initialisation.")
@@ -84,17 +90,8 @@ async fn unmute(ctx: &Context, msg: &Message) {
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-        if let Err(e) = handler.mute(false).await {
-            check_msg(msg.channel_id.say(ctx, format!("Failed: {:?}", e)).await);
-        }
 
-        check_msg(msg.channel_id.say(ctx, "Unmuted").await);
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(ctx, "Not in a voice channel to unmute in")
-                .await,
-        )
+        check_result(handler.mute(false).await, "Err when unmuting");
     }
 }
 
@@ -110,21 +107,13 @@ async fn mute(ctx: &Context, msg: &Message) {
     let handler_lock = match manager.get(guild_id) {
         Some(handler) => handler,
         None => {
-            check_msg(msg.reply(ctx, "Not in a voice channel").await);
-
             return;
         }
     };
 
     let mut handler = handler_lock.lock().await;
 
-    if handler.is_mute() {
-        check_msg(msg.channel_id.say(ctx, "Already muted").await);
-    } else {
-        if let Err(e) = handler.mute(true).await {
-            check_msg(msg.channel_id.say(ctx, format!("Failed: {:?}", e)).await);
-        }
-
-        check_msg(msg.channel_id.say(ctx, "Now muted").await);
+    if !handler.is_mute() {
+        check_result(handler.mute(true).await, "Err when muting");
     }
 }
