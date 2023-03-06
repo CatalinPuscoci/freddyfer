@@ -22,19 +22,20 @@ impl EventHandler for MainEventHandler {
     }
 
     async fn voice_state_update(&self, ctx: Context, _old: Option<VoiceState>, _new: VoiceState) {
-        println!(
-            "{} joined voice channel {}",
-            _new.member.unwrap().user,
-            _new.channel_id.unwrap()
-        );
-
         let manager = songbird::get(&ctx)
             .await
             .expect("Songbird Voice client placed in at initialisation.")
             .clone();
 
         let guild = _new.guild_id.unwrap();
-        let channel_id = _new.channel_id.unwrap();
+        let channel_id = match _new.channel_id{
+            Some(channel_id) =>{
+                channel_id
+            }
+            None => {
+                return 
+            }
+        };
 
         if let Some(handler_lock) = manager.get(guild) {
             let mut handler = handler_lock.lock().await;
@@ -47,7 +48,7 @@ impl EventHandler for MainEventHandler {
                     let source = input::ffmpeg(get_sound_path("Aloooo.mp3")).await.unwrap();
                     let (mut audio, _) = create_player(source);
                     thread::sleep(Duration::from_millis(1000));
-                    audio.set_volume(0.25);
+                    audio.set_volume(0.5);
                     handler.play(audio);
                     println!("playing")
                 }
