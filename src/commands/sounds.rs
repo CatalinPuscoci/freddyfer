@@ -1,0 +1,351 @@
+use std::{thread, time::Duration};
+
+use rand::Rng;
+use serenity::{
+    framework::standard::{
+        macros::{command, group},
+        Args, CommandResult,
+    },
+    model::prelude::Message,
+    prelude::Context,
+};
+use songbird::input::{self, Restartable};
+
+use crate::utils::{
+    checks::check_msg,
+    parse::{get_repeat_count, get_sound_path},
+};
+
+#[group]
+#[commands(play, queue, skip, stop, sound, spam, siren)]
+pub struct Sounds;
+
+#[command]
+#[only_in(guilds)]
+pub async fn sound(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let file = match args.single_quoted::<String>() {
+        Ok(file) => file,
+        Err(_) => {
+            check_msg(msg.channel_id.say(ctx, "Not a string???").await);
+
+            return Ok(());
+        }
+    };
+    if file.starts_with('/')
+        || file.starts_with('\\')
+        || file.starts_with('.')
+        || file.starts_with('~')
+    {
+        check_msg(msg.channel_id.say(ctx, "uhhhh no").await);
+        return Ok(());
+    }
+
+    let path = get_sound_path(file.as_str());
+
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let source = match input::ffmpeg(path.clone()).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("Err starting source: {:?}", why);
+
+                check_msg(msg.channel_id.say(ctx, "Error sourcing ffmpeg").await);
+
+                return Ok(());
+            }
+        };
+
+        // This handler object will allow you to, as needed,
+        // control the audio track via events and further commands.
+        handler.play_only_source(source);
+    }
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn spam(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let file = match args.single_quoted::<String>() {
+        Ok(file) => file,
+        Err(_) => {
+            check_msg(msg.channel_id.say(ctx, "Not a string???").await);
+
+            return Ok(());
+        }
+    };
+
+    if file.starts_with('/')
+        || file.starts_with('\\')
+        || file.starts_with('.')
+        || file.starts_with('~')
+    {
+        check_msg(msg.channel_id.say(ctx, "uhhhh no").await);
+
+        return Ok(());
+    }
+
+    let path = get_sound_path(file.as_str());
+
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let repeat_count = get_repeat_count(args, 10);
+
+        for _ in 0..repeat_count {
+            let source = input::ffmpeg(path.clone()).await.unwrap();
+            let mut rng = rand::thread_rng();
+            thread::sleep(Duration::from_millis(rng.gen_range(25..125)));
+            handler.play_source(source);
+        }
+    }
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn siren(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let pathl = get_sound_path("tacil.ogg");
+    let pathr = get_sound_path("tacir.ogg");
+
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let repeat_count = get_repeat_count(args, 10);
+
+        // This handler object will allow you to, as needed,
+        // control the audio track via events and further commands.
+        let mut use_left_path = false;
+
+        for _ in 0..repeat_count {
+            use_left_path = !use_left_path;
+
+            let path = if use_left_path {
+                pathl.clone()
+            } else {
+                pathr.clone()
+            };
+
+            let source = match input::ffmpeg(path).await {
+                Ok(source) => source,
+                Err(why) => {
+                    println!("Err starting source: {:?}", why);
+                    check_msg(msg.channel_id.say(ctx, "Error sourcing ffmpeg").await);
+                    return Ok(());
+                }
+            };
+
+            handler.enqueue_source(source);
+        }
+    }
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let url = match args.single::<String>() {
+        Ok(url) => url,
+        Err(_) => {
+            check_msg(
+                msg.channel_id
+                    .say(ctx, "Must provide a URL to a video or audio")
+                    .await,
+            );
+
+            return Ok(());
+        }
+    };
+
+    if !url.starts_with("http") {
+        check_msg(msg.channel_id.say(ctx, "Must provide a valid URL").await);
+
+        return Ok(());
+    }
+
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let source = match input::ytdl(&url).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("Err starting source: {:?}", why);
+
+                check_msg(msg.channel_id.say(ctx, "Error sourcing ffmpeg").await);
+
+                return Ok(());
+            }
+        };
+
+        handler.enqueue_source(source);
+
+        check_msg(msg.channel_id.say(ctx, "Playing song").await);
+    } else {
+        check_msg(
+            msg.channel_id
+                .say(ctx, "Not in a voice channel to play in")
+                .await,
+        );
+    }
+
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn queue(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let url = match args.single::<String>() {
+        Ok(url) => url,
+        Err(_) => {
+            check_msg(
+                msg.channel_id
+                    .say(ctx, "Must provide a URL to a video or audio")
+                    .await,
+            );
+
+            return Ok(());
+        }
+    };
+
+    if !url.starts_with("http") {
+        check_msg(msg.channel_id.say(ctx, "Must provide a valid URL").await);
+
+        return Ok(());
+    }
+
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        // Here, we use lazy restartable sources to make sure that we don't pay
+        // for decoding, playback on tracks which aren't actually live yet.
+        let source = match Restartable::ytdl(url, true).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("Err starting source: {:?}", why);
+
+                check_msg(msg.channel_id.say(ctx, "Error sourcing ffmpeg").await);
+
+                return Ok(());
+            }
+        };
+
+        handler.enqueue_source(source.into());
+
+        check_msg(
+            msg.channel_id
+                .say(
+                    ctx,
+                    format!("Added song to queue: position {}", handler.queue().len()),
+                )
+                .await,
+        );
+    } else {
+        check_msg(
+            msg.channel_id
+                .say(ctx, "Not in a voice channel to play in")
+                .await,
+        );
+    }
+
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let handler = handler_lock.lock().await;
+        let queue = handler.queue();
+        let _ = queue.skip();
+
+        check_msg(
+            msg.channel_id
+                .say(ctx, format!("Song skipped: {} in queue.", queue.len()))
+                .await,
+        );
+    } else {
+        check_msg(
+            msg.channel_id
+                .say(ctx, "Not in a voice channel to play in")
+                .await,
+        );
+    }
+
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+    let guild = msg.guild(ctx).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+        handler.stop();
+        let queue = handler.queue();
+        queue.stop();
+
+        check_msg(msg.channel_id.say(ctx, "Queue cleared.").await);
+    } else {
+        check_msg(
+            msg.channel_id
+                .say(ctx, "Not in a voice channel to play in")
+                .await,
+        );
+    }
+
+    Ok(())
+}
