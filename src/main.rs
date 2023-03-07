@@ -4,7 +4,9 @@ mod utils;
 
 use std::env;
 
-use commands::{essentials::ESSENTIALS_GROUP, help::HELP, sounds::SOUNDS_GROUP};
+use commands::{
+    essentials::ESSENTIALS_GROUP, funny::FUNNY_GROUP, help::HELP, sounds::SOUNDS_GROUP,
+};
 use event_handlers::handler::MainEventHandler;
 use serenity::{client::Client, framework::StandardFramework, prelude::GatewayIntents};
 
@@ -20,6 +22,7 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("."))
         .group(&ESSENTIALS_GROUP)
+        .group(&FUNNY_GROUP)
         .group(&SOUNDS_GROUP)
         .help(&HELP);
 

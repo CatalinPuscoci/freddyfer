@@ -28,18 +28,21 @@ impl EventHandler for MainEventHandler {
             .clone();
 
         let guild = _new.guild_id.unwrap();
-        let channel_id = match _new.channel_id{
-            Some(channel_id) =>{
-                channel_id
-            }
-            None => {
-                return 
-            }
+        let channel_id = match _new.channel_id {
+            Some(channel_id) => channel_id,
+            None => return,
         };
 
         if let Some(handler_lock) = manager.get(guild) {
             let mut handler = handler_lock.lock().await;
-            if channel_id.0 == handler.current_channel().unwrap().0 {
+            let current_channel_id = match handler.current_channel() {
+                Some(chan_id) => chan_id,
+                None => {
+                    return;
+                }
+            };
+
+            if channel_id.0 == current_channel_id.0 {
                 let oldchannel = match _old {
                     Some(oldstate) => oldstate.channel_id,
                     None => None,
@@ -50,7 +53,7 @@ impl EventHandler for MainEventHandler {
                     thread::sleep(Duration::from_millis(1000));
                     audio.set_volume(0.5);
                     handler.play(audio);
-                    println!("playing")
+                    println!("Playing welcome sound...");
                 }
             }
         }
