@@ -18,11 +18,9 @@ pub(crate) fn get_repeat_count(mut args: Args, fallback_value: i32) -> i32 {
 pub(crate) fn get_sound_path(sound_name: &str) -> String {
     let path = format!("sounds/{}", sound_name);
     if Path::new(path.as_str()).exists() {
-        return path
-    }
-
-    else {
-        let sounds = vec!["sounds/ilie_cum.mp3","sounds/ilie_ha.mp3"];
+        path
+    } else {
+        let sounds = vec!["sounds/ilie_cum.mp3", "sounds/ilie_ha.mp3"];
         return sounds.choose(&mut rand::thread_rng()).unwrap().to_string();
     }
 }
