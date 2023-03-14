@@ -44,12 +44,13 @@ async fn main() {
 
             Config {
                 bot_token: env::var("DISCORD_TOKEN").expect("Expected a token in the environment"),
+                command_prefix: ".".to_string(),
             }
         }
     };
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("."))
+        .configure(|c| c.prefix(&config.command_prefix))
         .group(&ESSENTIALS_GROUP)
         .group(&FUNNY_GROUP)
         .group(&SOUNDS_GROUP)
