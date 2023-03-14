@@ -2,6 +2,7 @@ use std::{thread, time::Duration};
 
 use rand::Rng;
 use serenity::{
+    builder,
     framework::standard::{
         macros::{command, group},
         Args, CommandResult,
@@ -11,13 +12,16 @@ use serenity::{
 };
 use songbird::input::{self, Restartable};
 
-use crate::utils::{
-    checks::check_msg,
-    parse::{get_repeat_count, get_sound_path},
+use crate::{
+    cache::app_cache::AppCacheKey,
+    utils::{
+        checks::check_msg,
+        parse::{get_repeat_count, get_sound_path},
+    },
 };
 
 #[group]
-#[commands(play, queue, skip, stop, sound, spam, siren)]
+#[commands(play, queue, skip, stop, sound, sounds, spam, siren)]
 pub struct Sounds;
 
 #[command]
@@ -26,7 +30,11 @@ pub async fn sound(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     let file = match args.single_quoted::<String>() {
         Ok(file) => file,
         Err(_) => {
-            check_msg(msg.channel_id.say(ctx, "Not a string???").await);
+            check_msg(
+                msg.channel_id
+                    .say(ctx, "Sound name required! Use the \"sounds\" command to get a list of all the sounds.")
+                    .await,
+            );
 
             return Ok(());
         }
@@ -68,6 +76,51 @@ pub async fn sound(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
         // control the audio track via events and further commands.
         handler.play_only_source(source);
     }
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+pub async fn sounds(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let page_index = args.single::<usize>().unwrap_or(0);
+
+    if page_index == 0 {
+        check_msg(
+            msg.channel_id
+                .say(ctx, "Command requires a page index greater than 0.")
+                .await,
+        );
+
+        return Ok(());
+    }
+
+    let ctx_data = ctx.data.read().await;
+
+    let sound_page = match ctx_data.get::<AppCacheKey>() {
+        Some(app_cache) => app_cache.sounds_pages.get_page(page_index - 1),
+        None => {
+            println!("App cache not found.");
+            return Ok(());
+        }
+    };
+
+    if sound_page.is_none() {
+        check_msg(msg.channel_id.say(ctx, "Page not found").await);
+
+        return Ok(());
+    }
+
+    let mut embed = builder::CreateEmbed::default();
+
+    let embed_text = sound_page.unwrap().join("\n");
+    embed.field(page_index.to_string(), embed_text, true);
+
+    check_msg(
+        msg.channel_id
+            .send_message(ctx, |m| m.set_embed(embed))
+            .await,
+    );
+
     Ok(())
 }
 
@@ -121,25 +174,28 @@ pub async fn spam(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
 #[command]
 #[only_in(guilds)]
 pub async fn siren(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let option = match args.single::<String>(){
-        Ok(option) => {option}
-        Err(_)=> {
+    let option = match args.single::<String>() {
+        Ok(option) => option,
+        Err(_) => {
             check_msg(msg.reply(ctx, "Not even a string???😤😤😤").await);
-            return  Ok(())
+            return Ok(());
         }
     };
-    for c in option.chars(){
-        if c.is_numeric(){
-            check_msg(msg.reply(ctx, "Usage: .siren <tense|taci> <repeat count>").await);
-            return Ok(())
+    for c in option.chars() {
+        if c.is_numeric() {
+            check_msg(
+                msg.reply(ctx, "Usage: .siren <tense|taci> <repeat count>")
+                    .await,
+            );
+            return Ok(());
         }
     }
-    if !(option.eq(&"taci".to_string()) || option.eq(&"tense".to_string()) ){
-                    check_msg(msg.reply(ctx, "Stiu doar tense si taci").await);
-                    return Ok(())
+    if !(option.eq(&"taci".to_string()) || option.eq(&"tense".to_string())) {
+        check_msg(msg.reply(ctx, "Stiu doar tense si taci").await);
+        return Ok(());
     }
-    let pathl = get_sound_path(format!("{}l.ogg",option).as_str());
-    let pathr = get_sound_path(format!("{}r.ogg",option).as_str());
+    let pathl = get_sound_path(format!("{}l.ogg", option).as_str());
+    let pathr = get_sound_path(format!("{}r.ogg", option).as_str());
     let guild = msg.guild(ctx).unwrap();
     let guild_id = guild.id;
 
