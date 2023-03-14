@@ -1,3 +1,4 @@
+mod cache;
 mod commands;
 mod event_handlers;
 mod models;
@@ -5,6 +6,7 @@ mod utils;
 
 use std::{env, fs::File, io::Read};
 
+use cache::app_cache::{create_app_cache, AppCacheKey};
 use commands::{
     essentials::ESSENTIALS_GROUP, funny::FUNNY_GROUP, help::HELP, sounds::SOUNDS_GROUP,
 };
@@ -58,8 +60,11 @@ async fn main() {
 
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
+    let app_cache = create_app_cache();
+
     let mut client = Client::builder(&config.bot_token, intents)
         .event_handler(MainEventHandler)
+        .type_map_insert::<AppCacheKey>(app_cache)
         .framework(framework)
         .register_songbird()
         .await
